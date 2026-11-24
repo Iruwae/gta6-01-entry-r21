@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOLMAR BAY — an open-world crime game</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0e24;
+    font-family: 'Segoe UI', system-ui, sans-serif; color: #f2f2ea; }
+  #game-canvas { position: fixed; inset: 0; display: block; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.55); }
+  #damage-flash { position: fixed; inset: 0; pointer-events: none; z-index: 6;
+    background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,0,0,0.55) 100%);
+    opacity: 0; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  #hud-tl { position: absolute; top: 14px; left: 16px; text-shadow: 0 1px 3px #000; }
+  #hud-money { font-size: 30px; font-weight: 800; color: #7dff9a; }
+  #hud-respect { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #ffd166; margin-top: 2px; }
+  #hud-respect-bar { width: 190px; height: 6px; background: rgba(0,0,0,0.55); border-radius: 3px; margin-top: 4px; }
+  #hud-respect-fill { height: 100%; width: 0%; background: #ffd166; border-radius: 3px; }
+  #hud-clock { font-size: 13px; color: #d8d8c8; margin-top: 4px; }
+  #hud-tr { position: absolute; top: 14px; right: 16px; text-align: right; text-shadow: 0 1px 3px #000; }
+  #hud-stars { font-size: 26px; letter-spacing: 3px; color: #666; }
+  #hud-stars.hot { color: #ff3344; }
+  #hud-radio { font-size: 13px; color: #9fd8ff; margin-top: 2px; }
+  #hud-mission { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    background: rgba(10,10,20,0.62); border: 1px solid rgba(255,209,102,0.5);
+    padding: 8px 16px; border-radius: 6px; font-size: 14px; max-width: 46vw; text-align: center; }
+  #hud-bl { position: absolute; left: 16px; bottom: 16px; width: 210px; }
+  #hud-bar { height: 10px; background: rgba(0,0,0,0.55); border-radius: 5px; margin-top: 5px; overflow: hidden; }
+  #hud-health-fill { height: 100%; background: #37d67a; }
+  #hud-armor-fill { height: 100%; background: #4cc9f0; }
+  #hud-bc { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); text-align: center;
+    text-shadow: 0 1px 3px #000; }
+  #hud-weapon { font-size: 17px; font-weight: 700; }
+  #hud-ammo { font-size: 14px; color: #ffd166; }
+  #hud-speed { font-size: 24px; font-weight: 800; margin-top: 2px; }
+  #hud-subtitle { position: absolute; bottom: 118px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.72); padding: 8px 18px; border-radius: 6px; font-size: 16px;
+    max-width: 60vw; text-align: center; opacity: 0; transition: opacity 0.25s; }
+  #hud-subtitle.show { opacity: 1; }
+  #hud-hint { position: absolute; bottom: 16px; left: 240px; font-size: 13px; color: #e8e8d8;
+    text-shadow: 0 1px 3px #000; }
+  #hud-toasts { position: absolute; right: 16px; top: 110px; width: 320px; display: flex;
+    flex-direction: column; gap: 6px; align-items: flex-end; }
+  .toast { background: rgba(10,10,20,0.78); border-left: 4px solid #4cc9f0; padding: 7px 12px;
+    border-radius: 5px; font-size: 13px; transition: opacity 0.4s; max-width: 320px; }
+  .toast.good { border-left-color: #37d67a; }
+  .toast.bad { border-left-color: #ff3344; }
+  .toast.fade { opacity: 0; }
+  #hud-minimap { position: absolute; right: 16px; bottom: 16px; border: 2px solid rgba(255,255,255,0.35);
+    border-radius: 6px; background: #101018; }
+  .pause-menu { position: absolute; inset: 0; background: rgba(8,8,18,0.88); z-index: 20;
+    pointer-events: auto; overflow-y: auto; padding: 40px; }
+  .pause-menu h2 { color: #ffd166; margin-top: 0; }
+  .pause-menu h3 { color: #4cc9f0; margin-bottom: 6px; }
+  .pause-menu ul { list-style: none; padding: 0; }
+  .pause-menu li { padding: 4px 0; font-size: 14px; }
+  .pause-menu li.done { color: #7dff9a; }
+  .pause-menu li.active { color: #ffd166; font-weight: 700; }
+  .pause-menu li.locked { color: #777; }
+  .pause-menu li span { float: right; font-size: 12px; text-transform: uppercase; }
+  .menu-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(12,12,22,0.96); border: 1px solid #4cc9f0; border-radius: 10px;
+    padding: 22px 26px; z-index: 30; pointer-events: auto; width: 480px; max-width: 92vw; }
+  .menu-panel h2 { margin: 0 0 8px; color: #ffd166; }
+  .menu-money { color: #7dff9a; font-weight: 700; }
+  .menu-row { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 14px; }
+  .menu-row button { background: #2ec4b6; border: none; color: #06281f; font-weight: 700;
+    padding: 6px 14px; border-radius: 5px; cursor: pointer; }
+  .menu-row button:disabled { background: #444; color: #999; cursor: default; }
+  .menu-row .maxed { color: #7dff9a; font-weight: 700; }
+  .menu-hint { color: #999; font-size: 12px; margin-top: 12px; }
+  body.cutscene::before, body.cutscene::after { content: ''; position: fixed; left: 0; right: 0;
+    height: 9vh; background: #000; z-index: 15; }
+  body.cutscene::before { top: 0; }
+  body.cutscene::after { bottom: 0; }
+</style>
+</head>
+<body>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
